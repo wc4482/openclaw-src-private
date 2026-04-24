@@ -531,7 +531,7 @@ describe("task-registry", () => {
     });
   });
 
-  it("delivers ACP completion to the requester channel when a delivery origin exists", async () => {
+  it("does not deliver generic ACP completion to the requester channel when a delivery origin exists", async () => {
     await withTaskRegistryTempDir(async (root) => {
       process.env.OPENCLAW_STATE_DIR = root;
       resetTaskRegistryForTests();
@@ -570,22 +570,10 @@ describe("task-registry", () => {
       await waitForAssertion(() =>
         expect(findTaskByRunId("run-delivery")).toMatchObject({
           status: "succeeded",
-          deliveryStatus: "delivered",
+          deliveryStatus: "pending",
         }),
       );
-      await waitForAssertion(() =>
-        expect(hoisted.sendMessageMock).toHaveBeenCalledWith(
-          expect.objectContaining({
-            channel: "telegram",
-            to: "telegram:123",
-            threadId: "321",
-            content: expect.stringContaining("Background task done: ACP background task"),
-            mirror: expect.objectContaining({
-              sessionKey: "agent:main:main",
-            }),
-          }),
-        ),
-      );
+      expect(hoisted.sendMessageMock).not.toHaveBeenCalled();
       expect(peekSystemEvents("agent:main:main")).toEqual([]);
     });
   });
@@ -675,7 +663,7 @@ describe("task-registry", () => {
     });
   });
 
-  it("marks internal fallback delivery as session queued instead of delivered", async () => {
+  it("does not queue a generic ACP completion into the parent session fallback", async () => {
     await withTaskRegistryTempDir(async (root) => {
       process.env.OPENCLAW_STATE_DIR = root;
       resetTaskRegistryForTests();
@@ -704,12 +692,10 @@ describe("task-registry", () => {
       await waitForAssertion(() =>
         expect(findTaskByRunId("run-session-queued")).toMatchObject({
           status: "succeeded",
-          deliveryStatus: "session_queued",
+          deliveryStatus: "pending",
         }),
       );
-      expect(peekSystemEvents("agent:main:main")).toEqual([
-        expect.stringContaining("Background task done: ACP background task"),
-      ]);
+      expect(peekSystemEvents("agent:main:main")).toEqual([]);
       expect(hoisted.sendMessageMock).not.toHaveBeenCalled();
     });
   });
@@ -747,7 +733,7 @@ describe("task-registry", () => {
     });
   });
 
-  it("does not include internal progress detail in the terminal channel message", async () => {
+  it("does not treat internal ACP progress detail as terminal success output", async () => {
     await withTaskRegistryTempDir(async (root) => {
       process.env.OPENCLAW_STATE_DIR = root;
       resetTaskRegistryForTests();
@@ -790,12 +776,12 @@ describe("task-registry", () => {
       });
 
       await waitForAssertion(() =>
-        expect(hoisted.sendMessageMock).toHaveBeenCalledWith(
-          expect.objectContaining({
-            content: "Background task done: ACP background task (run run-deta).",
-          }),
-        ),
+        expect(findTaskByRunId("run-detail-leak")).toMatchObject({
+          status: "succeeded",
+          deliveryStatus: "pending",
+        }),
       );
+      expect(hoisted.sendMessageMock).not.toHaveBeenCalled();
     });
   });
 
@@ -878,6 +864,83 @@ describe("task-registry", () => {
       );
       expect(peekSystemEvents("agent:main:main")).toEqual([]);
       expect(hasPendingHeartbeatWake()).toBe(false);
+    });
+  });
+
+  it("delivers ACP completion once an explicit terminal summary is reconciled", async () => {
+    await withTaskRegistryTempDir(async (root) => {
+      process.env.OPENCLAW_STATE_DIR = root;
+      resetTaskRegistryForTests();
+      hoisted.sendMessageMock.mockResolvedValue({
+        channel: "telegram",
+        to: "telegram:123",
+        via: "direct",
+      });
+
+      createTaskRecord({
+        runtime: "acp",
+        ownerKey: "agent:main:main",
+        scopeKind: "session",
+        requesterOrigin: {
+          channel: "telegram",
+          to: "telegram:123",
+          threadId: "321",
+        },
+        childSessionKey: "agent:main:acp:child",
+        runId: "run-reconciled-summary",
+        task: "Create the file and verify it",
+        status: "running",
+        deliveryStatus: "pending",
+        startedAt: 100,
+      });
+
+      emitAgentEvent({
+        runId: "run-reconciled-summary",
+        stream: "lifecycle",
+        data: {
+          phase: "end",
+          endedAt: 250,
+        },
+      });
+
+      await waitForAssertion(() => {
+        expect(findTaskByRunId("run-reconciled-summary")).toMatchObject({
+          status: "succeeded",
+          deliveryStatus: "pending",
+        });
+      });
+      const task = findTaskByRunId("run-reconciled-summary")!;
+
+      markTaskTerminalById({
+        taskId: task.taskId,
+        status: "succeeded",
+        endedAt: 300,
+        lastEventAt: 300,
+        terminalSummary: "Created /tmp/file.txt and verified contents.",
+        terminalOutcome: "succeeded",
+      });
+      await maybeDeliverTaskTerminalUpdate(task.taskId);
+
+      await waitForAssertion(() =>
+        expect(findTaskByRunId("run-reconciled-summary")).toMatchObject({
+          status: "succeeded",
+          deliveryStatus: "delivered",
+          terminalOutcome: "succeeded",
+          terminalSummary: "Created /tmp/file.txt and verified contents.",
+        }),
+      );
+      expect(hoisted.sendMessageMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          channel: "telegram",
+          to: "telegram:123",
+          threadId: "321",
+          content:
+            "Background task done: ACP background task (run run-reco). Created /tmp/file.txt and verified contents.",
+          mirror: expect.objectContaining({
+            sessionKey: "agent:main:main",
+          }),
+        }),
+      );
     });
   });
 
@@ -1685,7 +1748,7 @@ describe("task-registry", () => {
     });
   });
 
-  it("keeps background ACP progress off the foreground lane and only sends a terminal notify", async () => {
+  it("keeps background ACP progress off the foreground lane without sending a generic terminal notify", async () => {
     await withTaskRegistryTempDir(async (root) => {
       process.env.OPENCLAW_STATE_DIR = root;
       resetTaskRegistryForTests();
@@ -1746,13 +1809,11 @@ describe("task-registry", () => {
       });
       await flushAsyncWork();
 
-      expect(hoisted.sendMessageMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          channel: "discord",
-          to: "discord:123",
-          content: "Background task done: ACP background task (run run-quie).",
-        }),
-      );
+      expect(findTaskByRunId("run-quiet-terminal")).toMatchObject({
+        status: "succeeded",
+        deliveryStatus: "pending",
+      });
+      expect(hoisted.sendMessageMock).not.toHaveBeenCalled();
       expect(peekSystemEvents("agent:main:main")).toEqual([]);
       relay.dispose();
       vi.useRealTimers();

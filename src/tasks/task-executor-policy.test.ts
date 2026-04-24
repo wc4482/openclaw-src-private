@@ -124,11 +124,35 @@ describe("task-executor-policy", () => {
       shouldAutoDeliverTaskTerminalUpdate(
         createTask({
           status: "succeeded",
+          terminalSummary: "Created /tmp/file.txt and verified contents.",
           deliveryStatus: "pending",
           notifyPolicy: "done_only",
         }),
       ),
     ).toBe(true);
+    expect(
+      shouldAutoDeliverTaskTerminalUpdate(
+        createTask({
+          runtime: "acp",
+          status: "succeeded",
+          deliveryStatus: "pending",
+          terminalSummary: undefined,
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      shouldAutoDeliverTaskTerminalUpdate(
+        createTask({
+          runtime: "acp",
+          status: "succeeded",
+          deliveryStatus: "pending",
+          terminalSummary: [
+            "OpenClaw runtime context (internal):",
+            "This context is runtime-generated, not user-authored. Keep internal details private.",
+          ].join("\n"),
+        }),
+      ),
+    ).toBe(false);
     expect(
       shouldAutoDeliverTaskTerminalUpdate(
         createTask({

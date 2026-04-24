@@ -26,6 +26,14 @@ function resolveTaskRunLabel(task: TaskRecord): string {
   return task.runId ? ` (run ${task.runId.slice(0, 8)})` : "";
 }
 
+function hasDeliverableAcpSuccessSummary(task: TaskRecord): boolean {
+  if (task.runtime !== "acp" || task.status !== "succeeded" || task.terminalOutcome === "blocked") {
+    return true;
+  }
+  // ACP success delivery requires an explicit synthesized terminal summary.
+  return Boolean(sanitizeTaskStatusText(task.terminalSummary));
+}
+
 export function formatTaskTerminalMessage(task: TaskRecord): string {
   const title = resolveTaskDisplayTitle(task);
   const runLabel = resolveTaskRunLabel(task);
@@ -97,6 +105,9 @@ export function shouldAutoDeliverTaskTerminalUpdate(task: TaskRecord): boolean {
     return false;
   }
   if (!isTerminalTaskStatus(task.status)) {
+    return false;
+  }
+  if (!hasDeliverableAcpSuccessSummary(task)) {
     return false;
   }
   return task.deliveryStatus === "pending";
