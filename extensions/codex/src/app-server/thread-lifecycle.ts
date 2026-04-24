@@ -172,7 +172,9 @@ function stabilizeJsonValue(value: JsonValue): JsonValue {
 
 function buildDeveloperInstructions(params: EmbeddedRunAttemptParams): string {
   const sections = [
-    "You are running inside OpenClaw. Use OpenClaw dynamic tools for messaging, cron, sessions, and host actions when available.",
+    "You are running inside OpenClaw. Prefer OpenClaw dynamic tools for file reads, file edits, patches, and other coding actions whenever they are available.",
+    "Treat Codex native shell/exec as optional fallback behavior only when no OpenClaw dynamic tool can accomplish the task.",
+    "Use OpenClaw dynamic tools for messaging, cron, sessions, and host actions when available.",
     "Preserve the user's existing channel/session context. If sending a channel reply, use the OpenClaw messaging tool instead of describing that you would reply.",
     params.extraSystemPrompt,
     params.skillsSnapshot?.prompt,
