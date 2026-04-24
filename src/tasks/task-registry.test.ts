@@ -1053,6 +1053,7 @@ describe("task-registry", () => {
         task: "Direct ACP child",
         status: "succeeded",
         deliveryStatus: "pending",
+        terminalSummary: "Direct ACP task completed and reconciled.",
       });
       const spawnedTask = createTaskRecord({
         runtime: "acp",
@@ -1068,6 +1069,7 @@ describe("task-registry", () => {
         preferMetadata: true,
         status: "succeeded",
         deliveryStatus: "pending",
+        terminalSummary: "Spawn ACP task completed and reconciled.",
       });
 
       await maybeDeliverTaskTerminalUpdate(directTask.taskId);
@@ -1115,11 +1117,13 @@ describe("task-registry", () => {
         taskId: victimTask.taskId,
         status: "succeeded",
         endedAt: 250,
+        terminalSummary: "Victim ACP task completed and reconciled.",
       });
       markTaskTerminalById({
         taskId: attackerTask.taskId,
         status: "succeeded",
         endedAt: 260,
+        terminalSummary: "Attacker ACP task completed and reconciled.",
       });
       await maybeDeliverTaskTerminalUpdate(victimTask.taskId);
       await maybeDeliverTaskTerminalUpdate(attackerTask.taskId);
