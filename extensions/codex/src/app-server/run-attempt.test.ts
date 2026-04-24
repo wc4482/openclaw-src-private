@@ -156,6 +156,9 @@ describe("runCodexAppServerAttempt", () => {
           params: expect.objectContaining({
             model: "gpt-5.4-codex",
             modelProvider: "openai",
+            developerInstructions: expect.stringContaining(
+              "Prefer OpenClaw dynamic tools for file reads, file edits, patches, and other coding actions whenever they are available.",
+            ),
           }),
         },
         {
