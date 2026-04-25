@@ -575,22 +575,10 @@ describe("task-registry", () => {
       await waitForAssertion(() =>
         expect(findTaskByRunId("run-delivery")).toMatchObject({
           status: "succeeded",
-          deliveryStatus: "delivered",
+          deliveryStatus: "pending",
         }),
       );
-      await waitForAssertion(() =>
-        expect(hoisted.sendMessageMock).toHaveBeenCalledWith(
-          expect.objectContaining({
-            channel: "notifychat",
-            to: "notifychat:123",
-            threadId: "321",
-            content: expect.stringContaining("Background task done: ACP background task"),
-            mirror: expect.objectContaining({
-              sessionKey: "agent:main:main",
-            }),
-          }),
-        ),
-      );
+      expect(hoisted.sendMessageMock).not.toHaveBeenCalled();
       expect(peekSystemEvents("agent:main:main")).toEqual([]);
     });
   });
@@ -709,12 +697,10 @@ describe("task-registry", () => {
       await waitForAssertion(() =>
         expect(findTaskByRunId("run-session-queued")).toMatchObject({
           status: "succeeded",
-          deliveryStatus: "session_queued",
+          deliveryStatus: "pending",
         }),
       );
-      expect(peekSystemEvents("agent:main:main")).toEqual([
-        expect.stringContaining("Background task done: ACP background task"),
-      ]);
+      expect(peekSystemEvents("agent:main:main")).toEqual([]);
       expect(hoisted.sendMessageMock).not.toHaveBeenCalled();
     });
   });
@@ -794,13 +780,8 @@ describe("task-registry", () => {
         },
       });
 
-      await waitForAssertion(() =>
-        expect(hoisted.sendMessageMock).toHaveBeenCalledWith(
-          expect.objectContaining({
-            content: "Background task done: ACP background task (run run-deta).",
-          }),
-        ),
-      );
+      await flushAsyncWork();
+      expect(hoisted.sendMessageMock).not.toHaveBeenCalled();
     });
   });
 
@@ -995,6 +976,7 @@ describe("task-registry", () => {
         task: "Direct ACP child",
         status: "succeeded",
         deliveryStatus: "pending",
+        terminalSummary: "Direct task finished cleanly.",
       });
       const spawnedTask = createTaskRecord({
         runtime: "acp",
@@ -1010,6 +992,7 @@ describe("task-registry", () => {
         preferMetadata: true,
         status: "succeeded",
         deliveryStatus: "pending",
+        terminalSummary: "Spawned task finished cleanly.",
       });
 
       await maybeDeliverTaskTerminalUpdate(directTask.taskId);
@@ -1057,11 +1040,13 @@ describe("task-registry", () => {
         taskId: victimTask.taskId,
         status: "succeeded",
         endedAt: 250,
+        terminalSummary: "Victim task finished cleanly.",
       });
       markTaskTerminalById({
         taskId: attackerTask.taskId,
         status: "succeeded",
         endedAt: 260,
+        terminalSummary: "Attacker task finished cleanly.",
       });
       await maybeDeliverTaskTerminalUpdate(victimTask.taskId);
       await maybeDeliverTaskTerminalUpdate(attackerTask.taskId);
@@ -1757,13 +1742,7 @@ describe("task-registry", () => {
       });
       await flushAsyncWork();
 
-      expect(hoisted.sendMessageMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          channel: "guildchat",
-          to: "guildchat:123",
-          content: "Background task done: ACP background task (run run-quie).",
-        }),
-      );
+      expect(hoisted.sendMessageMock).not.toHaveBeenCalled();
       expect(peekSystemEvents("agent:main:main")).toEqual([]);
       relay.dispose();
       vi.useRealTimers();

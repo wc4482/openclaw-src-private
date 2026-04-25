@@ -128,6 +128,17 @@ describe("task-executor-policy", () => {
           notifyPolicy: "done_only",
         }),
       ),
+    ).toBe(false);
+    expect(
+      shouldAutoDeliverTaskTerminalUpdate(
+        createTask({
+          runtime: "acp",
+          status: "succeeded",
+          terminalSummary: "Created /tmp/file.txt and verified contents.",
+          deliveryStatus: "pending",
+          notifyPolicy: "done_only",
+        }),
+      ),
     ).toBe(true);
     expect(
       shouldAutoDeliverTaskTerminalUpdate(
