@@ -99,6 +99,12 @@ export function shouldAutoDeliverTaskTerminalUpdate(task: TaskRecord): boolean {
   if (!isTerminalTaskStatus(task.status)) {
     return false;
   }
+  if (task.runtime === "acp" && task.status === "succeeded" && task.terminalOutcome !== "blocked") {
+    const summary = sanitizeTaskStatusText(task.terminalSummary);
+    if (!summary) {
+      return false;
+    }
+  }
   return task.deliveryStatus === "pending";
 }
 

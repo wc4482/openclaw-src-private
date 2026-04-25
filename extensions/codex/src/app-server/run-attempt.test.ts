@@ -1041,6 +1041,13 @@ describe("runCodexAppServerAttempt", () => {
       developerInstructions: expect.stringContaining(CODEX_GPT5_BEHAVIOR_CONTRACT),
       persistExtendedHistory: true,
     });
+    const resumeRequest = requests.find((request) => request.method === "thread/resume");
+    expect(
+      (resumeRequest?.params as { developerInstructions?: string } | undefined)
+        ?.developerInstructions,
+    ).toContain(
+      "prefer OpenClaw dynamic tools whenever available; use native shell/exec only when no OpenClaw dynamic tool can accomplish the task.",
+    );
   });
 
   it("resumes a bound Codex thread when only dynamic tool descriptions change", async () => {
